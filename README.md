@@ -4,7 +4,6 @@ SurfMap is a powerful, automation-driven reconnaissance framework designed for c
 
 It integrates multiple industry-standard tools into a unified workflow, enabling deep attack surface mapping with minimal manual intervention.
 
---------------------------------------------------------------------
 
 ## 🚀 Overview
 
@@ -19,7 +18,6 @@ SurfMap performs end-to-end reconnaissance including:
 - Result Aggregation
 - Automated Report Generation
 
---------------------------------------------------------------------
 
 ## ✨ Features
 
@@ -41,7 +39,6 @@ Generates clean summaries with key metrics.
 📁 Structured Output  
 Organizes results in a clean, per-target directory format.
 
---------------------------------------------------------------------
 
 ## 🧱 Workflow
 
@@ -58,7 +55,6 @@ SurfMap follows a modular pipeline:
 
 Each stage enriches the dataset for the next.
 
---------------------------------------------------------------------
 
 ## ⚙️ Requirements
 
@@ -82,7 +78,6 @@ Each stage enriches the dataset for the next.
 
 - Python 3.7+  
 
---------------------------------------------------------------------
 
 ## 📦 Installation
 
@@ -106,7 +101,7 @@ Each stage enriches the dataset for the next.
    ~/tools/LinkFinder  
    ~/tools/JSParser  
 
---------------------------------------------------------------------
+
 
 ## 🧪 Usage
 
@@ -128,7 +123,7 @@ python3 surfmap.py -u example.com -skip-u test.example.com
 
 python3 surfmap.py -f targets.txt -skip-f out_of_scope.txt  
 
---------------------------------------------------------------------
+
 
 ## 🎯 Command Line Options
 
@@ -147,7 +142,6 @@ MISC:
 
 -h, --help         Show help menu  
 
---------------------------------------------------------------------
 
 ## 📁 Output Structure
 
@@ -172,7 +166,6 @@ recon/
     target2/
     mixed/
 
---------------------------------------------------------------------
 
 ## 🔍 Module Breakdown
 
@@ -233,7 +226,6 @@ Output:
 - final_endpoints.txt
 - endpoints_with_params.txt
 
---------------------------------------------------------------------
 
 ## 📊 Report Generation
 
@@ -252,7 +244,6 @@ Includes:
 - Endpoints  
 - Parameters  
 
---------------------------------------------------------------------
 
 ## ⚠️ Interrupt Handling
 
@@ -268,7 +259,6 @@ s → Stop scan
 Double Ctrl+C:
 → Force exit  
 
---------------------------------------------------------------------
 
 ## 🧹 Filtering & Exclusions
 
@@ -279,7 +269,6 @@ Supports:
 
 Applies filtering across all output files.
 
---------------------------------------------------------------------
 
 ## 🔗 Aggregation Mode
 
@@ -290,7 +279,6 @@ For multi-target scans:
 
 Useful for large-scale recon.
 
---------------------------------------------------------------------
 
 ## 🧠 Design Philosophy
 
@@ -300,7 +288,6 @@ Useful for large-scale recon.
 - Modular pipeline  
 - Resilient execution  
 
---------------------------------------------------------------------
 
 ## ⚡ Example Workflow
 
@@ -309,7 +296,6 @@ Useful for large-scale recon.
 3. Feed into fuzzers (ffuf, Burp Suite, etc.)  
 4. Identify vulnerabilities  
 
---------------------------------------------------------------------
 
 ## 🚧 Limitations
 
@@ -317,7 +303,6 @@ Useful for large-scale recon.
 - Performance depends on system resources  
 - Optional tools enhance coverage  
 
---------------------------------------------------------------------
 
 ## 🔮 Future Improvements
 
@@ -326,14 +311,12 @@ Useful for large-scale recon.
 - Cloud recon support  
 - Built-in vulnerability scanning  
 
---------------------------------------------------------------------
 
 ## 👨‍💻 Author
 
 Created by: SpidyRockss  
 Cybersecurity Specialist & VAPT Analyst  
 
---------------------------------------------------------------------
 
 ## 🚦 Versions
 ### 1.0.0
@@ -341,7 +324,6 @@ Cybersecurity Specialist & VAPT Analyst
 1.0.1 - Few Updates  
 1.0.2 - Added interactive c, s, n to Contine, Stop, Next
 
---------------------------------------------------------------------
 
 ## ⚖️ Disclaimer
 
@@ -349,7 +331,6 @@ This tool is intended for authorized security testing and educational purposes o
 
 Do NOT use it against systems without permission.
 
---------------------------------------------------------------------
 
 ## 🔐 Final Note
 
