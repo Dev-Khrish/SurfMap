@@ -9,6 +9,13 @@ import re
 import datetime
 import argparse
 
+# Platform-specific imports for raw keyboard input
+try:
+    import tty
+    import termios
+except ImportError:
+    pass # Windows fallback will be handled in getch()
+
 # Configuration
 home_dir = os.path.expanduser("~")
 
@@ -25,25 +32,77 @@ WHITE = '\033[1;37m'
 NC = '\033[0m' # No Color
 BOLD = '\033[1m'
 
-# Helper to run shell commands comfortably
-def run_command(command, shell=True, check=False, silent=False):
-    """Executes a shell command."""
-    try:
-        kwargs = {
-            'shell': shell,
-            'check': check
-        }
-        
-        if shell and shutil.which('bash'):
-            kwargs['executable'] = shutil.which('bash')
+# Global variable to track the last Ctrl+C time (for double-tap detection)
+last_sigint_time = 0
 
-        if silent:
-            result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
-        else:
-            result = subprocess.run(command, **kwargs)
-        return result.returncode == 0
-    except subprocess.CalledProcessError:
-        return False
+# Helper to read a single keypress without requiring 'Enter'
+def getch():
+    if sys.platform == "win32":
+        import msvcrt
+        return msvcrt.getch().decode('utf-8', 'ignore')
+    else:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+# Helper to run shell commands comfortably with Interactive Interrupts
+def run_command(command, shell=True, check=False, silent=False, stdout=None):
+    global last_sigint_time
+    
+    while True: # Loop allows us to restart the command if 'c' is pressed
+        try:
+            kwargs = {
+                'shell': shell,
+                'check': check
+            }
+            
+            if shell and shutil.which('bash'):
+                kwargs['executable'] = shutil.which('bash')
+
+            if silent:
+                result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
+            elif stdout:
+                result = subprocess.run(command, stdout=stdout, stderr=subprocess.DEVNULL, **kwargs)
+            else:
+                result = subprocess.run(command, **kwargs)
+                
+            return result.returncode == 0
+            
+        except KeyboardInterrupt:
+            # Detect Double Ctrl+C (within 1 second)
+            current_time = time.time()
+            if current_time - last_sigint_time < 1.0:
+                print(f"\r\n{RED}[!] Double Ctrl+C detected! Force stopping scan completely...{NC}\n")
+                sys.exit(1)
+                
+            last_sigint_time = current_time
+            
+            # Interactive prompt
+            print(f"\r\n{YELLOW}┌────────────────────────────────────────────────────────┐{NC}")
+            print(f"\r{YELLOW}│{NC} ⚠️ {BOLD}Process Interrupted!{NC}                                 {YELLOW}│{NC}")
+            print(f"\r{YELLOW}│{NC} '{CYAN}c{NC}' to restart tool | '{CYAN}n{NC}' to skip | '{RED}s{NC}' to stop scan   {YELLOW}│{NC}")
+            print(f"\r{YELLOW}└────────────────────────────────────────────────────────┘{NC}")
+            print("\r> ", end='', flush=True)
+
+            while True:
+                choice = getch().lower()
+                if choice == 'c':
+                    print(f"\r{YELLOW}[♦] INFO    ❯ Restarting the interrupted tool...{NC}\n")
+                    break # Breaks the inner prompt loop, goes back to while True to restart the command
+                elif choice == 'n':
+                    print(f"\r{YELLOW}[♦] INFO    ❯ Skipping current tool and continuing...{NC}\n")
+                    return False # Gracefully return and move to the next command
+                elif choice == 's':
+                    print(f"\r\n{RED}[♦] ERROR   ❯ Scan stopped by user.{NC}\n")
+                    sys.exit(1)
+                elif choice == '\x03': # \x03 is the ASCII code for Ctrl+C
+                    print(f"\r\n{RED}[!] Force stopping scan completely...{NC}\n")
+                    sys.exit(1)
 
 # Helper to count lines in a file
 def count_lines(filepath):
@@ -263,7 +322,7 @@ def js_endpoint_extraction():
                     for url in f:
                         url = url.strip()
                         if url:
-                            subprocess.run(f"python3 {home_dir}/tools/JSParser/JSParser.py -u \"{url}\"", shell=True, stdout=out, stderr=subprocess.DEVNULL)
+                            run_command(f"python3 {home_dir}/tools/JSParser/JSParser.py -u \"{url}\"", shell=True, stdout=out)
         except Exception:
             pass
     
@@ -323,7 +382,7 @@ def parameter_discovery():
     
     print_status("Running Arjun for parameter discovery...")
     if count_valid > 0:
-        subprocess.run(f"arjun -i {valid_file} -t 50 -oT arjun_params.txt 2> arjun_run.log", shell=True, check=False)
+        run_command(f"arjun -i {valid_file} -t 50 -oT arjun_params.txt 2> arjun_run.log", shell=True)
     else:
         run_command("touch arjun_params.txt")
         print_warning("No valid URLs to scan with Arjun.")
@@ -350,7 +409,6 @@ def cleanup_and_merge():
     print_success(f"Merged {endpoint_count} unique endpoints")
     print_success(f"Found {param_endpoint_count} endpoints with parameters")
 
-# Rewritten in pure Python so it never leaves .tmp files behind
 def filter_exclusions(work_dir, excluded_domains):
     section_header("OUT-OF-SCOPE FILTERING")
     print_status(f"Checking for ineligible domains and cleaning shit up...")
@@ -367,15 +425,12 @@ def filter_exclusions(work_dir, excluded_domains):
     ]
     
     for fname in files_to_clean:
-        # Construct exact absolute path to ensure we hit the right file
         file_path = os.path.join(work_dir, fname)
         if os.path.isfile(file_path):
             try:
-                # Read contents safely
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     lines = f.readlines()
                 
-                # Write back only if the line doesn't contain the excluded domains
                 with open(file_path, 'w', encoding='utf-8') as f:
                     for line in lines:
                         if not any(ex in line.lower() for ex in excluded_lower):
@@ -520,29 +575,23 @@ def aggregate_mixed_results(base_dir):
     print_success(f"All target results cleanly aggregated into: {mixed_dir}")
 
 def main():
-    # Capture the directory where the user launched the script so we never get lost
     initial_cwd = os.getcwd()
     
-    # 1. Handle "No Arguments" check
     if len(sys.argv) == 1:
         show_banner()
         print_error("No target specified! You must provide a target to begin reconnaissance.")
         print_status("Run the tool with -h, --help, or /h to see available commands and usage.\n")
         sys.exit(1)
         
-    # 2. Handle Help check (custom flags including /h)
     if '-h' in sys.argv or '--help' in sys.argv or '/h' in sys.argv:
         show_help()
 
-    # Disable default argparse help so our custom one takes over
     parser = argparse.ArgumentParser(description="SurfMap - Advanced Reconnaissance Suite", add_help=False)
     
-    # Target inputs
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-u', '--url', help="Single target domain to scan")
     group.add_argument('-f', '--file', help="Text file containing a list of target domains")
     
-    # Skip inputs
     parser.add_argument('-skip-u', '--skip-url', help="Single domain to skip/exclude from results")
     parser.add_argument('-skip-f', '--skip-file', help="Text file containing domains to skip/exclude")
     parser.add_argument('-skip-sub', '--skip-subdomains', action='store_true', help="Skip subdomain enumeration and use the target directly")
@@ -550,11 +599,9 @@ def main():
     try:
         args = parser.parse_args()
     except SystemExit:
-        # If argparse fails (e.g., missing required arguments), guide the user to the help menu
         print(f"\n{YELLOW}[♦] INFO    ❯ Use -h, --help, or /h to see the correct usage syntax.{NC}")
         sys.exit(1)
     
-    # Build the master exclusion list
     excluded_domains = []
     if args.skip_url:
         excluded_domains.append(args.skip_url)
@@ -573,7 +620,6 @@ def main():
     
     if args.url:
         target = args.url
-        # Force absolute paths to prevent directory inception
         work_dir = os.path.abspath(os.path.join(initial_cwd, "recon", target))
         run_target_pipeline(target, work_dir, excluded_domains, args.skip_subdomains)
         
@@ -585,7 +631,6 @@ def main():
         filename = os.path.basename(args.file)
         name_without_ext = os.path.splitext(filename)[0]
         
-        # Force absolute paths to prevent directory inception
         base_dir = os.path.abspath(os.path.join(initial_cwd, "recon", name_without_ext))
         
         with open(args.file, 'r') as f:
@@ -604,7 +649,6 @@ def main():
             print(f"{PURPLE}  STARTING PIPELINE FOR: {WHITE}{target}{NC}")
             print(f"{PURPLE}============================================================{NC}")
             
-            # Using os.path.join with base_dir (which is absolute) makes work_dir absolutely bulletproof
             work_dir = os.path.join(base_dir, target)
             run_target_pipeline(target, work_dir, excluded_domains, args.skip_subdomains)
             
@@ -617,5 +661,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n{RED}Process interrupted by user.{NC}")
+        print(f"\n\r{RED}[!] Process interrupted by user. Scan aborted.{NC}")
         sys.exit(1)
