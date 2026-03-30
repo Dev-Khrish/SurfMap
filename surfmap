@@ -1,0 +1,506 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import time
+import shutil
+import subprocess
+import re
+import datetime
+import argparse
+
+# Configuration
+home_dir = os.path.expanduser("~")
+
+# Color definitions
+RED = '\033[0;31m'
+GREEN = '\033[0;32m'
+YELLOW = '\033[1;33m'
+BLUE = '\033[0;34m'
+PURPLE = '\033[0;35m'
+CYAN = '\033[0;36m'
+ORANGE = '\033[0;33m'
+PINK = '\033[1;35m'
+WHITE = '\033[1;37m'
+NC = '\033[0m' # No Color
+BOLD = '\033[1m'
+
+# Helper to run shell commands comfortably
+def run_command(command, shell=True, check=False, silent=False):
+    """Executes a shell command."""
+    try:
+        kwargs = {
+            'shell': shell,
+            'check': check
+        }
+        
+        if shell and shutil.which('bash'):
+            kwargs['executable'] = shutil.which('bash')
+
+        if silent:
+            result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
+        else:
+            result = subprocess.run(command, **kwargs)
+        return result.returncode == 0
+    except subprocess.CalledProcessError:
+        return False
+
+# Helper to count lines in a file
+def count_lines(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            return sum(1 for _ in f)
+    except FileNotFoundError:
+        return 0
+
+# Phantom Recon - Advanced Reconnaissance Suite
+def show_banner():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(f"{CYAN}┌──────────────────────────────────────────────────────────────┐")
+    print(f"│                                                              │")
+    print(f"│{BOLD}{WHITE}           ⚡ SURFMAP ⚡                  {NC}{CYAN}│")
+    print(f"│{PURPLE}          Advanced Reconnaissance & Analysis Suite            {NC}{CYAN}│")
+    print(f"│                                                              │")
+    print(f"│     {WHITE}[ Target Acquisition ]{NC}{CYAN} ❯ {ORANGE}[ Asset Discovery ]{NC}{CYAN} ❯ {GREEN}[ Analysis ]{NC}{CYAN}│")
+    print(f"│                                                              │")
+    print(f"├──────────────────────────────────────────────────────────────┤")
+    print(f"│  {WHITE}🔍 Subdomain Enumeration     🎯 Parameter Discovery{NC}{CYAN}         │")
+    print(f"│  {WHITE}⚡ Live Host Detection       🔮 JavaScript Analysis{NC}{CYAN}         │")
+    print(f"│  {WHITE}🌐 Asset Reconnaissance      🛡️ Vulnerability Scanning{NC}{CYAN}      │")
+    print(f"│                                                              │")
+    print(f"├──────────────────────────────────────────────────────────────┤")
+    print(f"│                                                              │")
+    print(f"│  {PINK}Created by:{NC} {WHITE}SpidyRockss{NC}{CYAN}                                              │")
+    print(f"│  {CYAN}Cybersecurity Specialist & VAPT Analyst{NC}{CYAN}                │")
+    print(f"│                                                              │")
+    print(f"└──────────────────────────────────────────────────────────────┘{NC}")
+    
+    print(f"\n{YELLOW}")
+    print("Initializing reconnaissance framework...")
+    time.sleep(0.5)
+    print("Loading security modules...")
+    time.sleep(0.5)
+    print("Preparing attack surface analysis...")
+    time.sleep(0.5)
+    print(f"{GREEN}✓ All systems ready!{NC}")
+    print()
+
+def progress_indicator(message):
+    print(f"\n{YELLOW}┌──────────────────────────────────────┐{NC}")
+    print(f"{YELLOW}│{NC} 🚀 {message}")
+    print(f"{YELLOW}└──────────────────────────────────────┘{NC}")
+    
+    spinstr = '⣾⣽⣻⢿⡿⣟⣯⣷'
+    sys.stdout.write("  ")
+    for _ in range(15):
+        for char in spinstr:
+            sys.stdout.write(f" {CYAN}[{char}]{NC} ")
+            sys.stdout.flush()
+            time.sleep(0.1)
+            sys.stdout.write("\b" * 6)
+    sys.stdout.write("    \b\b\b\b")
+    print()
+
+def section_header(title):
+    title_length = len(title)
+    padding = (50 - title_length) // 2
+    pad_str = ' ' * padding
+    
+    print(f"\n{PURPLE}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓")
+    print(f"┃{pad_str}{BOLD}{WHITE}{title}{NC}{PURPLE}{pad_str}        ┃")
+    print(f"┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛{NC}")
+
+def print_status(message):
+    print(f"{BLUE}[♦] {BOLD}INFO{NC}    ❯ {message}")
+
+def print_success(message):
+    print(f"{GREEN}[♦] {BOLD}SUCCESS{NC} ❯ {message}")
+
+def print_warning(message):
+    print(f"{YELLOW}[♦] {BOLD}WARNING{NC} ❯ {message}")
+
+def print_error(message):
+    print(f"{RED}[♦] {BOLD}ERROR{NC}   ❯ {message}")
+
+def check_dependencies():
+    section_header("DEPENDENCY CHECK")
+    
+    tools = ["subfinder", "assetfinder", "gau", "waybackurls", "katana", "arjun"]
+    missing = []
+    
+    for tool in tools:
+        if not shutil.which(tool):
+            missing.append(tool)
+    
+    if not shutil.which("httpx-toolkit") and not shutil.which("httprobe"):
+        missing.append("httpx-toolkit or httprobe")
+    
+    if missing:
+        print_error(f"Missing dependencies: {' '.join(missing)}")
+        print_status("Please install missing tools before proceeding")
+        sys.exit(1)
+    
+    if not os.path.isfile(f"{home_dir}/tools/LinkFinder/linkfinder.py"):
+        print_warning("LinkFinder not found. JS endpoint extraction will be limited.")
+    
+    if not os.path.isfile(f"{home_dir}/tools/JSParser/JSParser.py"):
+        print_warning("JSParser not found. JS endpoint extraction will be limited.")
+    
+    if not shutil.which("xnLinkFinder"):
+        print_warning("xnLinkFinder not found. JS endpoint extraction will be limited.")
+    
+    print_success("All required dependencies are available")
+
+def subdomain_enum(target):
+    section_header("SUBDOMAIN ENUMERATION")
+    
+    print_status("Running subfinder...")
+    run_command(f"subfinder -d {target} -all -o subfinder.txt")
+    
+    print_status("Running assetfinder...")
+    run_command(f"assetfinder --subs-only {target} > assetfinder.txt")
+    
+    print_status("Combining and sorting results...")
+    run_command("cat subfinder.txt assetfinder.txt | sort -u > all_subs.txt")
+    
+    subdomain_count = count_lines("all_subs.txt")
+    print_success(f"Discovered {subdomain_count} unique subdomains")
+    
+    print(f"\n{CYAN}Top 5 subdomains:{NC}")
+    run_command("head -n 5 all_subs.txt | nl", shell=True)
+
+def live_host_discovery():
+    section_header("LIVE HOST DISCOVERY")
+    
+    if shutil.which("httpx-toolkit"):
+        print_status("Probing for live hosts with httpx-toolkit...")
+        if run_command("httpx-toolkit -l all_subs.txt --silent --status-code --title --tech-detect -o alive_subs.txt", silent=True):
+            print_success("httpx-toolkit with long-form flags worked")
+        else:
+            print_warning("httpx-toolkit long-form flags failed, trying basic mode")
+            run_command("cat all_subs.txt | httpx-toolkit -o alive_subs.txt")
+            
+    elif shutil.which("httprobe"):
+        print_status("Probing for live hosts with httprobe...")
+        run_command("cat all_subs.txt | httprobe -c 50 > alive_subs.txt")
+    else:
+        print_error("Neither httpx-toolkit nor httprobe is available")
+        sys.exit(1)
+    
+    alive_count = count_lines("alive_subs.txt")
+    print_success(f"Found {alive_count} live hosts (Detailed output saved to alive_subs.txt)")
+    
+    # Create the filtered domain/URL list for easy copy-pasting
+    print_status("Creating clean URLs file (just domains)...")
+    run_command("awk '{print $1}' alive_subs.txt > alive_urls_only.txt")
+    print_success("Saved clean URLs to alive_urls_only.txt")
+    
+    print(f"\n{CYAN}Top 5 live hosts:{NC}")
+    run_command("head -n 5 alive_urls_only.txt | nl", shell=True)
+
+def url_collection():
+    section_header("URL COLLECTION")
+    
+    print_status("Fetching URLs with GAU...")
+    # Utilizing the newly created alive_urls_only.txt file
+    run_command("cat alive_urls_only.txt | gau --threads 50 --blacklist png,jpg,gif,svg > gau_urls.txt")
+    
+    print_status("Fetching URLs with Wayback Machine...")
+    run_command("cat alive_urls_only.txt | waybackurls > wayback.txt")
+    
+    print_status("Crawling with Katana...")
+    run_command("katana -list alive_urls_only.txt -d 5 -js-crawl -o katana_urls.txt")
+    
+    print_status("Combining and sorting results...")
+    run_command("cat gau_urls.txt wayback.txt katana_urls.txt | sort -u > all_urls.txt")
+    
+    url_count = count_lines("all_urls.txt")
+    print_success(f"Collected {url_count} unique URLs")
+
+def js_endpoint_extraction():
+    section_header("JAVASCRIPT ANALYSIS")
+    
+    print_status("Extracting JavaScript files...")
+    run_command("cat all_urls.txt | grep -Ei \"\\.js$\" | sort -u > jsfiles.txt")
+    
+    js_count = count_lines("jsfiles.txt")
+    print_success(f"Found {js_count} JavaScript files")
+    
+    if os.path.isfile(f"{home_dir}/tools/LinkFinder/linkfinder.py"):
+        print_status("Running LinkFinder...")
+        run_command(f"python3 {home_dir}/tools/LinkFinder/linkfinder.py -i jsfiles.txt -o cli > linkfinder_endpoints.txt")
+    
+    if os.path.isfile(f"{home_dir}/tools/JSParser/JSParser.py"):
+        print_status("Running JSParser...")
+        try:
+            with open("jsfiles.txt", "r") as f:
+                with open("jsparser_endpoints.txt", "w") as out:
+                    for url in f:
+                        url = url.strip()
+                        if url:
+                            subprocess.run(f"python3 {home_dir}/tools/JSParser/JSParser.py -u \"{url}\"", shell=True, stdout=out, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    
+    if shutil.which("xnLinkFinder"):
+        print_status("Running xnLinkFinder...")
+        run_command("cat jsfiles.txt | xnLinkFinder -stdin -o xn_endpoints.txt")
+
+def parameter_discovery():
+    section_header("PARAMETER DISCOVERY")
+    
+    print_status("Preparing URLs for parameter discovery...")
+
+    if os.path.exists("all_urls.txt"):
+        run_command("grep \"=\" all_urls.txt | sort -u > urls_temp.txt")
+    else:
+        run_command("touch urls_temp.txt")
+
+    valid_file = "urls_for_arjun.txt"
+    invalid_file = "bad_urls.txt"
+    
+    open(valid_file, 'w').close()
+    open(invalid_file, 'w').close()
+
+    try:
+        with open("urls_temp.txt", "r", encoding="utf-8", errors="ignore") as f_in, \
+             open(valid_file, "a") as f_valid, \
+             open(invalid_file, "a") as f_invalid:
+            
+            for url in f_in:
+                url = url.strip()
+                if not url:
+                    continue
+
+                if not re.match(r"^https?://", url):
+                    f_invalid.write(url + "\n")
+                    continue
+                
+                proto_count = url.lower().count("http")
+                if proto_count > 1:
+                    f_invalid.write(url + "\n")
+                    continue
+                
+                if re.search(r"[\(\)\<\>\'\"\ \{\\]", url):
+                    f_invalid.write(url + "\n")
+                    continue
+                
+                f_valid.write(url + "\n")
+                
+    except FileNotFoundError:
+        pass
+
+    if os.path.exists("urls_temp.txt"):
+        os.remove("urls_temp.txt")
+
+    count_valid = count_lines(valid_file)
+    print_success(f"Prepared {count_valid} valid URLs for Arjun")
+    
+    print_status("Running Arjun for parameter discovery...")
+    if count_valid > 0:
+        subprocess.run(f"arjun -i {valid_file} -t 50 -oT arjun_params.txt 2> arjun_run.log", shell=True, check=False)
+    else:
+        run_command("touch arjun_params.txt")
+        print_warning("No valid URLs to scan with Arjun.")
+
+    param_count = count_lines("arjun_params.txt")
+    print_success(f"Discovered {param_count} parameters")
+    
+    print(f"\n{CYAN}Top 5 discovered parameters:{NC}")
+    run_command("head -n 5 arjun_params.txt | nl", shell=True)
+
+def cleanup_and_merge():
+    section_header("RESULTS AGGREGATION")
+    
+    print_status("Merging all endpoints...")
+    cmd = "cat linkfinder_endpoints.txt jsparser_endpoints.txt xn_endpoints.txt arjun_params.txt 2>/dev/null | sort -u > final_endpoints.txt"
+    run_command(cmd)
+    
+    print_status("Filtering endpoints with parameters...")
+    run_command("cat final_endpoints.txt | grep \"=\" > endpoints_with_params.txt")
+    
+    endpoint_count = count_lines("final_endpoints.txt")
+    param_endpoint_count = count_lines("endpoints_with_params.txt")
+    
+    print_success(f"Merged {endpoint_count} unique endpoints")
+    print_success(f"Found {param_endpoint_count} endpoints with parameters")
+
+def generate_report(target, duration):
+    section_header("REPORT GENERATION")
+    
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_file = f"recon_summary_{timestamp}.txt"
+    date_str = datetime.datetime.now().strftime("%a %b %d %H:%M:%S %Z %Y")
+    
+    sub_count = count_lines("all_subs.txt")
+    live_count = count_lines("alive_subs.txt")
+    url_count = count_lines("all_urls.txt")
+    js_count = count_lines("jsfiles.txt")
+    end_count = count_lines("final_endpoints.txt")
+    param_end_count = count_lines("endpoints_with_params.txt")
+
+    def get_head(filename, n=10):
+        try:
+            res = subprocess.run(f"head -n {n} {filename} | nl", shell=True, capture_output=True, text=True)
+            return res.stdout
+        except: return ""
+
+    with open(report_file, "w") as f:
+        f.write("╔══════════════════════════════════════════════════════════════╗\n")
+        f.write("║                    RECONNAISSANCE SUMMARY                    ║\n")
+        f.write("╠══════════════════════════════════════════════════════════════╣\n")
+        f.write(f"║ Target: {target}\n")
+        f.write(f"║ Date: {date_str}\n")
+        f.write(f"║ Duration: {duration} seconds\n")
+        f.write("╠══════════════════════════════════════════════════════════════╣\n")
+        f.write(f"║ Subdomains Found: {sub_count}\n")
+        f.write(f"║ Live Hosts: {live_count}\n")
+        f.write(f"║ URLs Collected: {url_count}\n")
+        f.write(f"║ JavaScript Files: {js_count}\n")
+        f.write(f"║ Endpoints Discovered: {end_count}\n")
+        f.write(f"║ Endpoints with Parameters: {param_end_count}\n")
+        f.write("╚══════════════════════════════════════════════════════════════╝\n")
+        f.write("\n")
+        f.write("TOP SUBDOMAINS:\n")
+        f.write(get_head("all_subs.txt"))
+        f.write("\n")
+        f.write("TOP LIVE HOSTS (CLEAN URLS):\n")
+        f.write(get_head("alive_urls_only.txt"))
+        f.write("\n")
+        f.write("TOP ENDPOINTS:\n")
+        f.write(get_head("final_endpoints.txt"))
+        f.write("\n")
+        f.write("========================================\n")
+        f.write("Report generated by SurfMap\n")
+        f.write("Created by SpidyRockss - Cybersecurity Specialist\n")
+        f.write("========================================\n")
+    
+    print_success(f"Report saved to: {report_file}")
+
+def show_summary(target, duration, target_dir):
+    section_header(f"MISSION COMPLETE: {target}")
+    
+    print(f"{GREEN}╔══════════════════════════════════════════════════════════════╗")
+    print(f"║                   RECONNAISSANCE COMPLETED                   ║")
+    print(f"╠══════════════════════════════════════════════════════════════╣")
+    print(f"║ Target: {CYAN}{target:<52}{NC}{GREEN} ║")
+    print(f"║ Duration: {CYAN}{str(duration) + ' seconds':<50}{NC}{GREEN} ║")
+    print(f"║ Results: {CYAN}{target_dir:<51}{NC}{GREEN} ║")
+    print(f"╚══════════════════════════════════════════════════════════════╝{NC}")
+    
+    print(f"\n{YELLOW}Key Findings:{NC}")
+    print(f"• Subdomains: {count_lines('all_subs.txt')}")
+    print(f"• Live Hosts: {count_lines('alive_urls_only.txt')}")
+    print(f"• URLs: {count_lines('all_urls.txt')}")
+    print(f"• Endpoints: {count_lines('final_endpoints.txt')}")
+    print(f"• Parameters: {count_lines('endpoints_with_params.txt')}")
+
+def run_target_pipeline(target, work_dir):
+    os.makedirs(work_dir, exist_ok=True)
+    os.chdir(work_dir)
+    print_status(f"Working directory set to: {os.getcwd()}")
+    
+    start_time = time.time()
+    
+    progress_indicator(f"Subdomain Enumeration - {target}")
+    subdomain_enum(target)
+    
+    progress_indicator(f"Live Host Discovery - {target}")
+    live_host_discovery()
+    
+    progress_indicator(f"URL Collection - {target}")
+    url_collection()
+    
+    progress_indicator(f"JavaScript Analysis - {target}")
+    js_endpoint_extraction()
+    
+    progress_indicator(f"Parameter Discovery - {target}")
+    parameter_discovery()
+    
+    progress_indicator(f"Results Aggregation - {target}")
+    cleanup_and_merge()
+    
+    end_time = time.time()
+    duration = int(end_time - start_time)
+    
+    generate_report(target, duration)
+    show_summary(target, duration, work_dir)
+
+def aggregate_mixed_results(base_dir):
+    section_header("AGGREGATING MIXED RESULTS")
+    mixed_dir = f"{base_dir}/mixed"
+    os.makedirs(mixed_dir, exist_ok=True)
+    
+    print_status(f"Merging all isolated target data into {mixed_dir}...")
+    
+    files_to_merge = [
+        "all_subs.txt", 
+        "alive_subs.txt", 
+        "alive_urls_only.txt",
+        "all_urls.txt", 
+        "jsfiles.txt", 
+        "final_endpoints.txt", 
+        "endpoints_with_params.txt"
+    ]
+    
+    for fname in files_to_merge:
+        # Find all matching files (ignoring the mixed folder itself to prevent loops) and concatenate them
+        cmd = f"find \"{base_dir}\" -type f -name \"{fname}\" | grep -v \"/mixed/\" | xargs cat 2>/dev/null | sort -u > \"{mixed_dir}/{fname}\""
+        run_command(cmd)
+        
+    print_success(f"All target results cleanly aggregated into: {mixed_dir}")
+
+def main():
+    parser = argparse.ArgumentParser(description="SurfMap - Advanced Reconnaissance Suite")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-u', '--url', help="Single target domain to scan")
+    group.add_argument('-f', '--file', help="Text file containing a list of target domains")
+    
+    args = parser.parse_args()
+    
+    show_banner()
+    check_dependencies()
+    
+    if args.url:
+        target = args.url
+        work_dir = f"{home_dir}/recon/{target}"
+        run_target_pipeline(target, work_dir)
+        
+    elif args.file:
+        if not os.path.isfile(args.file):
+            print_error(f"Provided file '{args.file}' does not exist.")
+            sys.exit(1)
+            
+        filename = os.path.basename(args.file)
+        name_without_ext = os.path.splitext(filename)[0]
+        base_dir = f"{home_dir}/recon/{name_without_ext}"
+        
+        with open(args.file, 'r') as f:
+            targets = [line.strip() for line in f if line.strip()]
+            
+        if not targets:
+            print_error("The provided domains file is empty.")
+            sys.exit(1)
+            
+        print_status(f"Loaded {len(targets)} targets from {args.file}")
+        
+        for target in targets:
+            print(f"\n{PURPLE}============================================================{NC}")
+            print(f"{PURPLE}  STARTING PIPELINE FOR: {WHITE}{target}{NC}")
+            print(f"{PURPLE}============================================================{NC}")
+            
+            work_dir = f"{base_dir}/{target}"
+            run_target_pipeline(target, work_dir)
+            
+        # Create the mixed directory and merge results once all are finished
+        aggregate_mixed_results(base_dir)
+
+    print(f"\n{YELLOW}Thank you for using {BOLD}SurfMap{NC}{YELLOW}!{NC}")
+    print(f"{CYAN}Stay curious, stay secure! 🔒{NC}")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(f"\n{RED}Process interrupted by user.{NC}")
+        sys.exit(1)
