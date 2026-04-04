@@ -5,8 +5,8 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Default permissions for the workflow (good baseline)
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -39,6 +39,14 @@ jobs:
     name: Publish package to PyPI
     needs: build
     runs-on: ubuntu-latest
+
+    # MUST match the Environment name configured in PyPI trusted publisher
+    environment: pypi
+
+    # Required for PyPI trusted publishing (OIDC)
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Download build artifacts
