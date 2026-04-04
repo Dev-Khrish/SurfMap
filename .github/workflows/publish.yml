@@ -5,7 +5,6 @@ on:
     types: [published]
   workflow_dispatch:
 
-# Default permissions for the workflow (good baseline)
 permissions:
   contents: read
 
@@ -13,7 +12,6 @@ jobs:
   build:
     name: Build distributions
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,10 +38,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
-    # MUST match the Environment name configured in PyPI trusted publisher
-    environment: pypi
+    environment:
+      name: pypi
 
-    # Required for PyPI trusted publishing (OIDC)
     permissions:
       id-token: write
       contents: read
