@@ -39,9 +39,6 @@ jobs:
     name: Publish package to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/surfmap
 
     steps:
       - name: Download build artifacts
