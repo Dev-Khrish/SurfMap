@@ -4,6 +4,8 @@ SurfMap is a powerful, automation-driven reconnaissance framework designed for c
 
 It integrates multiple industry-standard tools into a unified workflow, enabling deep attack surface mapping with minimal manual intervention.
 
+**➡️ [Complete Installation Guide →](INSTALL.md)**
+
 --------------------------------------------------------------------
 
 ## 🚀 Overview
@@ -86,20 +88,56 @@ Each stage enriches the dataset for the next.
 
 ## 📦 Installation
 
-1. Clone your repository
+### Option 1: Install from PyPI (Recommended)
 
-2. Install Go-based tools:
+```bash
+pip install surfmap
+```
 
-   go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest  
-   go install github.com/tomnomnom/assetfinder@latest  
-   go install github.com/lc/gau/v2/cmd/gau@latest  
-   go install github.com/tomnomnom/waybackurls@latest  
-   go install github.com/projectdiscovery/katana/cmd/katana@latest  
-   go install github.com/projectdiscovery/httpx/cmd/httpx@latest  
+Then run:
+```bash
+surfmap -u example.com
+```
 
-3. Install Arjun:
+### Option 2: Install from Source
 
-   pip install arjun  
+1. Clone the repository:
+
+```bash
+git clone https://github.com/dev-Khrish/surfmap.git
+cd surfmap
+```
+
+2. Install the package in development mode:
+
+```bash
+pip install -e .
+```
+
+3. Run SurfMap:
+
+```bash
+surfmap -u example.com
+```
+
+### Required External Tools
+
+Install these Go-based reconnaissance tools:
+
+```bash
+go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest  
+go install github.com/tomnomnom/assetfinder@latest  
+go install github.com/lc/gau/v2/cmd/gau@latest  
+go install github.com/tomnomnom/waybackurls@latest  
+go install github.com/projectdiscovery/katana/cmd/katana@latest  
+go install github.com/projectdiscovery/httpx/cmd/httpx@latest  
+```
+
+Install Arjun (Python-based parameter discovery):
+
+```bash
+pip install arjun
+```  
 
 4. (Optional) Clone additional tools:
 
@@ -112,40 +150,62 @@ Each stage enriches the dataset for the next.
 
 ### Basic Scan
 
-python3 surfmap.py -u example.com
+```bash
+surfmap -u example.com
+```
 
 ### Skip Subdomain Enumeration
 
-python3 surfmap.py -u example.com -skip-sub
+```bash
+surfmap -u example.com -skip-sub
+```
 
 ### Scan Multiple Targets
 
-python3 surfmap.py -f targets.txt
+```bash
+surfmap -f targets.txt
+```
 
 ### Exclude Domains
 
-python3 surfmap.py -u example.com -skip-u test.example.com  
+```bash
+surfmap -u example.com -skip-u test.example.com
+surfmap -f targets.txt -skip-f out_of_scope.txt
+```
 
-python3 surfmap.py -f targets.txt -skip-f out_of_scope.txt  
+### Display Help
+
+```bash
+surfmap -h
+```  
 
 --------------------------------------------------------------------
 
 ## 🎯 Command Line Options
 
-TARGET OPTIONS (Required):
+### Target Options (Required)
 
--u, --url          Single target domain  
--f, --file         File with multiple domains  
+- **-u, --url**  
+  Single target domain to scan (e.g., `example.com`)
 
-FILTER OPTIONS:
+- **-f, --file**  
+  Text file containing multiple domains (one per line)
 
--skip-sub          Skip subdomain enumeration  
--skip-u            Exclude specific domain  
--skip-f            Exclude domains from file  
+### Filter Options
 
-MISC:
+- **-skip-sub**  
+  Skip subdomain enumeration and use target directly
 
--h, --help         Show help menu  
+- **-skip-u, --skip-url**  
+  Exclude specific domain from results
+
+- **-skip-f, --skip-file**  
+  Text file with domains to exclude (one per line)
+
+### Miscellaneous
+
+- **-h, --help**  
+  Show help menu and exit  
 
 --------------------------------------------------------------------
 
@@ -330,7 +390,7 @@ Useful for large-scale recon.
 
 ## 👨‍💻 Author
 
-Created by: SpidyRockss  
+Created by: Khrish  
 Cybersecurity Specialist & VAPT Analyst  
 
 --------------------------------------------------------------------
@@ -340,6 +400,7 @@ Cybersecurity Specialist & VAPT Analyst
 1.0.0 - Base Version  
 1.0.1 - Few Updates  
 1.0.2 - Added interactive c, s, n to Continue, Stop, Next
+1.1.0 - Python Packaging Published
 
 --------------------------------------------------------------------
 

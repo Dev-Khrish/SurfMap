@@ -154,9 +154,9 @@ def show_help():
     
     print(f"{PURPLE}============================================================{NC}")
     print(f"{WHITE}💡 EXAMPLES:{NC}")
-    print(f"  {GREEN}1. Basic scan:{NC}                  python3 surfmap.py -u example.com")
-    print(f"  {GREEN}2. Scan without subdomains:{NC}     python3 surfmap.py -u example.com -skip-sub")
-    print(f"  {GREEN}3. Scan list with exclusions:{NC}   python3 surfmap.py -f targets.txt -skip-f out_of_scope.txt")
+    print(f"  {GREEN}1. Basic scan:{NC}                  surfmap -u example.com")
+    print(f"  {GREEN}2. Scan without subdomains:{NC}     surfmap -u example.com -skip-sub")
+    print(f"  {GREEN}3. Scan list with exclusions:{NC}   surfmap -f targets.txt -skip-f out_of_scope.txt")
     print(f"{PURPLE}============================================================{NC}\n")
     sys.exit(0)
 

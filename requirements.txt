@@ -1,0 +1,10 @@
+# Development and optional dependencies for SurfMap
+# Install with: pip install -r requirements.txt
+
+# Core dependency for parameter discovery
+arjun>=2.0.0
+
+# Optional: For development and testing
+pytest>=7.0.0
+black>=22.0.0
+flake8>=4.0.0
