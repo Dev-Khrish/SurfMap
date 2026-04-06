@@ -35,6 +35,64 @@ BOLD = '\033[1m'
 # Global variable to track the last Ctrl+C time (for double-tap detection)
 last_sigint_time = 0
 
+DEPENDENCIES = {
+    "subfinder": {
+        "required": True,
+        "detect": {"type": "cli", "name": "subfinder"},
+        "install": {"type": "apt", "package": "subfinder", "command": "apt install -y subfinder"},
+    },
+    "assetfinder": {
+        "required": True,
+        "detect": {"type": "cli", "name": "assetfinder"},
+        "install": {"type": "apt", "package": "assetfinder", "command": "apt install -y assetfinder"},
+    },
+    "gau": {
+        "required": True,
+        "detect": {"type": "cli", "name": "gau"},
+        "install": {"type": "go", "command": "go install github.com/lc/gau/v2/cmd/gau@latest"},
+    },
+    "waybackurls": {
+        "required": True,
+        "detect": {"type": "cli", "name": "waybackurls"},
+        "install": {"type": "go", "command": "go install github.com/tomnomnom/waybackurls@latest"},
+    },
+    "katana": {
+        "required": True,
+        "detect": {"type": "cli", "name": "katana"},
+        "install": {"type": "go", "command": "go install github.com/projectdiscovery/katana/cmd/katana@latest"},
+    },
+    "arjun": {
+        "required": True,
+        "detect": {"type": "cli", "name": "arjun"},
+        "install": {"type": "apt", "package": "arjun", "command": "apt install -y arjun"},
+    },
+    "http_probe": {
+        "required": True,
+        "label": "httpx-toolkit OR httprobe",
+        "detect": {"type": "any_cli", "names": ["httpx-toolkit", "httprobe"]},
+        "install": {
+            "type": "apt",
+            "package": "httpx-toolkit httprobe",
+            "command": "apt install -y httpx-toolkit httprobe",
+        },
+    },
+    "LinkFinder": {
+        "required": False,
+        "detect": {"type": "file", "path": "~/tools/LinkFinder/linkfinder.py"},
+        "install": {},
+    },
+    "JSParser": {
+        "required": False,
+        "detect": {"type": "file", "path": "~/tools/JSParser/JSParser.py"},
+        "install": {},
+    },
+    "xnLinkFinder": {
+        "required": False,
+        "detect": {"type": "cli", "name": "xnLinkFinder"},
+        "install": {"type": "pip", "command": f'"{sys.executable}" -m pip install xnLinkFinder'},
+    },
+}
+
 # Helper to read a single keypress without requiring 'Enter'
 def getch():
     if sys.platform == "win32":
@@ -140,7 +198,7 @@ def show_help():
     print(f"┃{BOLD}{WHITE}                   COMMAND LINE USAGE                     {NC}{PURPLE}┃")
     print(f"┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛{NC}\n")
     
-    print(f"{CYAN}🎯 TARGET OPTIONS (Required - Choose One):{NC}")
+    print(f"{CYAN}🎯 TARGET OPTIONS (Default Mode - Choose One):{NC}")
     print(f"  {GREEN}-u, --url{NC}             Single target domain to scan (e.g., example.com)")
     print(f"  {GREEN}-f, --file{NC}            Text file containing a list of target domains\n")
     
@@ -150,13 +208,15 @@ def show_help():
     print(f"  {YELLOW}-skip-f, --skip-file{NC}  Text file containing domains to skip/exclude\n")
     
     print(f"{CYAN}ℹ️ MISCELLANEOUS:{NC}")
+    print(f"  {BLUE}--setup{NC}                Install/validate dependencies only, then exit")
     print(f"  {BLUE}-h, --help, /h{NC}        Show this help message and exit\n")
     
     print(f"{PURPLE}============================================================{NC}")
     print(f"{WHITE}💡 EXAMPLES:{NC}")
-    print(f"  {GREEN}1. Basic scan:{NC}                  surfmap -u example.com")
-    print(f"  {GREEN}2. Scan without subdomains:{NC}     surfmap -u example.com -skip-sub")
-    print(f"  {GREEN}3. Scan list with exclusions:{NC}   surfmap -f targets.txt -skip-f out_of_scope.txt")
+    print(f"  {GREEN}1. Setup mode only:{NC}             surfmap --setup")
+    print(f"  {GREEN}2. Basic scan:{NC}                  surfmap -u example.com")
+    print(f"  {GREEN}3. Scan without subdomains:{NC}     surfmap -u example.com -skip-sub")
+    print(f"  {GREEN}4. Scan list with exclusions:{NC}   surfmap -f targets.txt -skip-f out_of_scope.txt")
     print(f"{PURPLE}============================================================{NC}\n")
     sys.exit(0)
 
@@ -208,34 +268,281 @@ def print_warning(message):
 def print_error(message):
     print(f"{RED}[♦] {BOLD}ERROR{NC}   ❯ {message}")
 
-def check_dependencies():
+def is_linux():
+    return sys.platform.startswith("linux")
+
+
+def is_root_user():
+    if hasattr(os, "geteuid"):
+        return os.geteuid() == 0
+    return False
+
+
+def run_setup_command(command, required=True):
+    kwargs = {"shell": True}
+    if shutil.which("bash"):
+        kwargs["executable"] = shutil.which("bash")
+
+    result = subprocess.run(command, capture_output=True, text=True, **kwargs)
+    if result.returncode == 0:
+        return True
+
+    error_text = (result.stderr or result.stdout or "").strip()
+    if error_text:
+        print_error(error_text.splitlines()[-1])
+
+    if required:
+        return False
+
+    return False
+
+
+def ensure_go_path_in_environment():
+    try:
+        gopath = subprocess.run("go env GOPATH", shell=True, capture_output=True, text=True, check=False).stdout.strip()
+    except Exception:
+        gopath = ""
+
+    if not gopath:
+        print_error("Unable to resolve GOPATH. Go-based dependency installation may fail.")
+        return False
+
+    go_bin = os.path.join(gopath, "bin")
+    current_path = os.environ.get("PATH", "")
+    path_entries = current_path.split(os.pathsep) if current_path else []
+    if go_bin not in path_entries:
+        os.environ["PATH"] = f"{current_path}{os.pathsep}{go_bin}" if current_path else go_bin
+        print_status(f"Added Go binaries to current PATH: {go_bin}")
+        print_status("For persistence, add this to your shell profile:")
+        print_status(f"export PATH=$PATH:{go_bin}")
+
+    return True
+
+
+def detect_dependency(dep_name, config):
+    detect_cfg = config.get("detect", {})
+    dep_type = detect_cfg.get("type")
+
+    if dep_type == "cli":
+        tool_name = detect_cfg.get("name", dep_name)
+        return bool(shutil.which(tool_name)), tool_name
+
+    if dep_type == "any_cli":
+        for tool_name in detect_cfg.get("names", []):
+            if shutil.which(tool_name):
+                return True, tool_name
+        return False, ", ".join(detect_cfg.get("names", []))
+
+    if dep_type == "file":
+        file_path = os.path.expanduser(detect_cfg.get("path", ""))
+        return os.path.isfile(file_path), file_path
+
+    return False, "unknown"
+
+
+def check_dependencies(log_missing=True):
     section_header("DEPENDENCY CHECK")
-    
-    tools = ["subfinder", "assetfinder", "gau", "waybackurls", "katana", "arjun"]
-    missing = []
-    
-    for tool in tools:
-        if not shutil.which(tool):
-            missing.append(tool)
-    
-    if not shutil.which("httpx-toolkit") and not shutil.which("httprobe"):
-        missing.append("httpx-toolkit or httprobe")
-    
-    if missing:
-        print_error(f"Missing dependencies: {' '.join(missing)}")
-        print_status("Please install missing tools before proceeding")
-        sys.exit(1)
-    
-    if not os.path.isfile(f"{home_dir}/tools/LinkFinder/linkfinder.py"):
-        print_warning("LinkFinder not found. JS endpoint extraction will be limited.")
-    
-    if not os.path.isfile(f"{home_dir}/tools/JSParser/JSParser.py"):
-        print_warning("JSParser not found. JS endpoint extraction will be limited.")
-    
-    if not shutil.which("xnLinkFinder"):
-        print_warning("xnLinkFinder not found. JS endpoint extraction will be limited.")
-    
-    print_success("All required dependencies are available")
+    print_status("Checking dependencies...")
+
+    status = {
+        "installed": [],
+        "missing_required": [],
+        "missing_optional": [],
+        "details": {},
+    }
+
+    for dep_name, config in DEPENDENCIES.items():
+        display_name = config.get("label", dep_name)
+        installed, detected_with = detect_dependency(dep_name, config)
+        status["details"][dep_name] = {
+            "installed": installed,
+            "detected_with": detected_with,
+            "required": config.get("required", False),
+            "display_name": display_name,
+        }
+
+        if installed:
+            status["installed"].append(dep_name)
+            print_success(f"{display_name} is installed")
+            continue
+
+        if config.get("required", False):
+            status["missing_required"].append(dep_name)
+            if log_missing:
+                print_warning(f"{display_name} is missing")
+        else:
+            status["missing_optional"].append(dep_name)
+            if log_missing:
+                print_warning(f"{display_name} not found (optional)")
+
+    print_status(
+        f"Installed: {len(status['installed'])} | Missing required: {len(status['missing_required'])} | Missing optional: {len(status['missing_optional'])}"
+    )
+    return status
+
+
+def install_base_prerequisites():
+    section_header("BASE PREREQUISITES")
+
+    if not is_linux():
+        print_warning("Automatic setup is currently supported for Linux environments only.")
+        return False
+
+    if not shutil.which("apt"):
+        print_error("apt is not available on this system. Cannot perform automatic setup.")
+        return False
+
+    apt_basics = ["zip", "curl", "wget", "git"]
+    missing_basics = [pkg for pkg in apt_basics if not shutil.which(pkg)]
+    go_missing = shutil.which("go") is None
+    if not missing_basics and not go_missing:
+        print_success("Base prerequisites already present")
+        return True
+
+    print_status("Installing base prerequisites...")
+    if not run_setup_command("apt update", required=True):
+        return False
+
+    if go_missing:
+        if shutil.which("snap"):
+            run_setup_command("snap refresh", required=False)
+            if not run_setup_command("snap install golang --classic", required=True):
+                return False
+        else:
+            print_error("snap is not available to install golang. Install Go manually and retry.")
+            return False
+    else:
+        print_success("Go is already installed")
+
+    if missing_basics:
+        if not run_setup_command(f"apt install -y {' '.join(missing_basics)}", required=True):
+            return False
+        print_success("Installed base utilities")
+    else:
+        print_success("Base utilities already installed")
+
+    return True
+
+
+def install_dependencies(status):
+    section_header("DEPENDENCY INSTALLATION")
+    print_status("Installing missing dependencies...")
+
+    if not is_linux():
+        print_error("Automatic dependency installation is supported only on Linux at the moment.")
+        return False
+
+    install_candidates = []
+    for dep_name in status["missing_required"]:
+        install_candidates.append(dep_name)
+
+    if not install_candidates:
+        print_success("No missing dependencies to install")
+        return True
+
+    apt_required = []
+    for dep_name in install_candidates:
+        install_cfg = DEPENDENCIES[dep_name].get("install", {})
+        if install_cfg.get("type") == "apt":
+            package_value = install_cfg.get("package", "")
+            if package_value:
+                apt_required.extend(package_value.split())
+
+    apt_required = sorted(set(apt_required))
+
+    if apt_required and not is_root_user():
+        print_warning("Some tools require sudo privileges.")
+        surfmap_path = shutil.which("surfmap")
+        if surfmap_path:
+            print_warning(f"Try: sudo \"{surfmap_path}\" --setup")
+        print_warning(f"Try: sudo \"{sys.executable}\" -m surfmap --setup")
+        print_warning("Or run from project root: sudo python3 surfmap.py --setup")
+        return False
+
+    if apt_required and not install_base_prerequisites():
+        return False
+
+    if apt_required:
+        print_status(f"[INSTALL] Installing APT tools: {' '.join(apt_required)}")
+        if not run_setup_command(f"apt install -y {' '.join(apt_required)}", required=True):
+            print_error("Failed to install required APT tools")
+            return False
+        print_success("APT tool installation completed")
+
+    if any(DEPENDENCIES[d].get("install", {}).get("type") == "go" for d in install_candidates):
+        if not ensure_go_path_in_environment():
+            return False
+
+    for dep_name in install_candidates:
+        dep_cfg = DEPENDENCIES[dep_name]
+        dep_required = dep_cfg.get("required", False)
+        display_name = dep_cfg.get("label", dep_name)
+        install_cfg = dep_cfg.get("install", {})
+        install_type = install_cfg.get("type")
+
+        if install_type == "apt":
+            installed, _ = detect_dependency(dep_name, dep_cfg)
+            if installed:
+                print_success(f"{display_name} installed successfully")
+            elif dep_required:
+                print_error(f"Failed to install {display_name}")
+                print_error(f"Critical dependency installation failed: {display_name}")
+                return False
+            else:
+                print_warning(f"Failed to install optional dependency: {display_name}")
+            continue
+
+        command = install_cfg.get("command")
+        if not command:
+            continue
+
+        print_status(f"[INSTALL] Installing {display_name} via {install_type}...")
+
+        if install_type == "git":
+            detect_path = os.path.expanduser(dep_cfg.get("detect", {}).get("path", ""))
+            if detect_path and os.path.isfile(detect_path):
+                print_success(f"{display_name} already present")
+                continue
+
+        if not run_setup_command(command, required=dep_required):
+            if dep_required:
+                print_error(f"Critical dependency installation failed: {display_name}")
+                return False
+            print_warning(f"Failed to install optional dependency: {display_name}")
+            continue
+
+        installed, _ = detect_dependency(dep_name, dep_cfg)
+        if installed:
+            print_success(f"{display_name} installed successfully")
+        elif dep_required:
+            print_error(f"Critical dependency installation failed: {display_name}")
+            return False
+        else:
+            print_warning(f"{display_name} installation completed but validation did not pass")
+
+    return True
+
+
+def prepare_environment(setup_only=False):
+    status = check_dependencies(log_missing=True)
+
+    if status["missing_required"]:
+        if not install_dependencies(status):
+            return False
+
+        print_status("Re-validating dependency state...")
+        status = check_dependencies(log_missing=False)
+
+    if status["missing_required"]:
+        failed_dep = DEPENDENCIES[status["missing_required"][0]].get("label", status["missing_required"][0])
+        print_error(f"Critical dependency installation failed: {failed_dep}")
+        print_error("Aborting execution.")
+        return False
+
+    if setup_only:
+        print_success("Setup mode complete. All required dependencies are available.")
+
+    return True
 
 def subdomain_enum(target):
     section_header("SUBDOMAIN ENUMERATION")
@@ -411,7 +718,7 @@ def cleanup_and_merge():
 
 def filter_exclusions(work_dir, excluded_domains):
     section_header("OUT-OF-SCOPE FILTERING")
-    print_status(f"Checking for ineligible domains and cleaning shit up...")
+    print_status("Checking for ineligible domains and cleaning output...")
     print_status(f"Domains to purge: {len(excluded_domains)}")
     
     excluded_lower = [d.lower() for d in excluded_domains]
@@ -576,31 +883,35 @@ def aggregate_mixed_results(base_dir):
 
 def main():
     initial_cwd = os.getcwd()
-    
-    if len(sys.argv) == 1:
-        show_banner()
-        print_error("No target specified! You must provide a target to begin reconnaissance.")
-        print_status("Run the tool with -h, --help, or /h to see available commands and usage.\n")
-        sys.exit(1)
         
     if '-h' in sys.argv or '--help' in sys.argv or '/h' in sys.argv:
         show_help()
 
     parser = argparse.ArgumentParser(description="SurfMap - Advanced Reconnaissance Suite", add_help=False)
     
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('-u', '--url', help="Single target domain to scan")
     group.add_argument('-f', '--file', help="Text file containing a list of target domains")
     
     parser.add_argument('-skip-u', '--skip-url', help="Single domain to skip/exclude from results")
     parser.add_argument('-skip-f', '--skip-file', help="Text file containing domains to skip/exclude")
     parser.add_argument('-skip-sub', '--skip-subdomains', action='store_true', help="Skip subdomain enumeration and use the target directly")
+    parser.add_argument('--setup', action='store_true', help="Install and validate dependencies only")
     
     try:
         args = parser.parse_args()
     except SystemExit:
         print(f"\n{YELLOW}[♦] INFO    ❯ Use -h, --help, or /h to see the correct usage syntax.{NC}")
         sys.exit(1)
+
+    if not args.setup and not args.url and not args.file:
+        show_banner()
+        print_error("No target specified! Provide -u/--url or -f/--file, or use --setup.")
+        print_status("Run the tool with -h, --help, or /h to see available commands and usage.\n")
+        sys.exit(1)
+
+    if args.setup and (args.url or args.file):
+        print_warning("--setup mode ignores target arguments and exits after environment preparation.")
     
     excluded_domains = []
     if args.skip_url:
@@ -616,7 +927,12 @@ def main():
             
     show_banner()
     startup_animation()
-    check_dependencies()
+    if not prepare_environment(setup_only=args.setup):
+        sys.exit(1)
+
+    if args.setup:
+        print(f"\n{YELLOW}Setup mode finished successfully.{NC}")
+        sys.exit(0)
     
     if args.url:
         target = args.url

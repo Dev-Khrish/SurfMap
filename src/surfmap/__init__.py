@@ -5,6 +5,6 @@ A powerful, automation-driven reconnaissance framework designed for cybersecurit
 professionals, bug bounty hunters, and penetration testers.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "Khrish"
 __description__ = "Advanced Reconnaissance & Analysis Suite"

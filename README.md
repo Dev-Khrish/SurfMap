@@ -396,6 +396,9 @@ Cybersecurity Specialist & VAPT Analyst
 --------------------------------------------------------------------
 
 ## 🚦 Versions
+### 1.2.0
+1.2.0 - Dependency setup flow refactor, Added setup mode and environment bootstrap, Removed forced reinstall flag
+
 ### 1.0.0
 1.0.0 - Base Version  
 1.0.1 - Few Updates  
