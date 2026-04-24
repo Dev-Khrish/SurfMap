@@ -12,7 +12,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="surfmap",
-    version="1.2.0",
+    version = "1.2.1",
     description="Advanced Reconnaissance & Analysis Suite for cybersecurity professionals",
     long_description=README,
     long_description_content_type="text/markdown",
